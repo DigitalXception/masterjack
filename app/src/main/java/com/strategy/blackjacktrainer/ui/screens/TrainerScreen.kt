@@ -34,7 +34,7 @@ import com.strategy.blackjacktrainer.ui.theme.*
 
 @Composable
 fun TrainerScreen(vm: TrainerViewModel, onPopOut: () -> Unit) {
-    var showSettings by remember { mutableStateOf(false) }
+    var showSettings: Boolean by remember { mutableStateOf(false) }
     val hands = vm.hands
     val feedback = vm.feedback
     val stats = vm.stats
@@ -541,7 +541,7 @@ private fun FeedbackCard(feedback: Feedback) {
 @Composable
 private fun SettingsDialog(onDismiss: () -> Unit) {
     val context = LocalContext.current
-    var blackAndWhite by remember { mutableStateOf(AppColorMode.blackAndWhite) }
+    var blackAndWhite: Boolean by remember { mutableStateOf(AppColorMode.blackAndWhite) }
 
     AlertDialog(
         onDismissRequest = onDismiss,
