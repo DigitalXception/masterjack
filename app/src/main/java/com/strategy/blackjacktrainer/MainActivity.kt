@@ -23,6 +23,7 @@ import com.strategy.blackjacktrainer.ui.screens.MistakesScreen
 import com.strategy.blackjacktrainer.ui.screens.StrategyChartScreen
 import com.strategy.blackjacktrainer.ui.screens.TrainerPipScreen
 import com.strategy.blackjacktrainer.ui.screens.TrainerScreen
+import com.strategy.blackjacktrainer.ui.theme.AppColorMode
 import com.strategy.blackjacktrainer.ui.theme.BlackjackTrainerTheme
 import com.strategy.blackjacktrainer.ui.theme.Emerald
 import com.strategy.blackjacktrainer.ui.theme.SurfaceDark
