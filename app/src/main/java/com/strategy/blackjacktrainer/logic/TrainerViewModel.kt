@@ -4,6 +4,7 @@ import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
 import androidx.lifecycle.ViewModel
+import com.strategy.blackjacktrainer.data.DiagnosticSeenStore
 import com.strategy.blackjacktrainer.data.MistakeEntry
 import com.strategy.blackjacktrainer.data.MistakeStore
 import com.strategy.blackjacktrainer.data.PlayingCard
@@ -49,7 +50,10 @@ data class DiagnosticDecisionCase(
     val label: String
 )
 
-class TrainerViewModel(private val store: MistakeStore) : ViewModel() {
+class TrainerViewModel(
+    private val store: MistakeStore,
+    private val seenStore: DiagnosticSeenStore
+) : ViewModel() {
 
     // ---- Round state ----
 
@@ -113,6 +117,11 @@ class TrainerViewModel(private val store: MistakeStore) : ViewModel() {
         private set
 
     private var diagnosticDecisionCases by mutableStateOf<Map<String, DiagnosticDecisionCase>>(emptyMap())
+        /** True when every diagnostic decision scenario has been seen by the user in this session.
+     * Reported once the unseen-case queue is drained with no first-pass misses to correct. */
+    var diagnosticComplete: Boolean by mutableStateOf(false)
+        private set
+
     private var diagnosticCanDoubleOverride: Boolean? = null
     private var diagnosticCanSplitOverride: Boolean? = null
     private var diagnosticCanSurrenderOverride: Boolean? = null
@@ -175,6 +184,8 @@ class TrainerViewModel(private val store: MistakeStore) : ViewModel() {
     }
 
     private fun startDiagnostic() {
+        seenStore.clear()
+        diagnosticComplete = false
         diagnosticCases = buildDiagnosticCases()
         diagnosticIndex = 0
         diagnosticFirstPassCorrect = 0
@@ -319,8 +330,13 @@ class TrainerViewModel(private val store: MistakeStore) : ViewModel() {
             diagnosticFirstPassAttempts++
             if (correct) diagnosticFirstPassCorrect++
 
+            // Record this decision-level scenario as seen (covers hits/continuations too,
+            // since chooseDiagnostic is re-entered for every decision in a multi-card hand).
+            val seenKey = diagnosticDecisionKey(handRead, dealer.strategyLabel, canDouble, canSplit, canSurrender)
+            seenStore.addKey(seenKey)
+
             if (!correct) {
-                val key = diagnosticDecisionKey(handRead, dealer.strategyLabel, canDouble, canSplit, canSurrender)
+                val key = seenKey
                 val updated = diagnosticMissCounts.toMutableMap()
                 updated[key] = (updated[key] ?: 0) + 1
                 diagnosticMissCounts = updated
@@ -432,6 +448,10 @@ class TrainerViewModel(private val store: MistakeStore) : ViewModel() {
                 DiagnosticPhase.COMPLETE
             } else {
                 DiagnosticPhase.TRANSITION
+            }
+            // No unseen standalone cases remain; the first-pass queue is drained.
+            if (diagnosticPhase == DiagnosticPhase.COMPLETE) {
+                diagnosticComplete = true
             }
             return
         }
@@ -622,7 +642,23 @@ class TrainerViewModel(private val store: MistakeStore) : ViewModel() {
         }
 
         // Each case appears exactly once in a pass, but every new diagnosis uses a fresh random order.
-        return result.shuffled()
+        val shuffled = result.shuffled()
+
+        // Never repeat a scenario the user has already seen in a diagnostic session.
+        val seen = seenStore.getSeenKeys()
+        return shuffled.filterNot { case -> caseLabelKey(case) in seen }
+    }
+
+    /** Stable key for a diagnostic *case* (pre-decision context), matching the decision-level
+     * [diagnosticDecisionKey] shape: handLabel|dealerLabel|D{double}|P{split}|R{surrender}. */
+    private fun caseLabelKey(case: DiagnosticCase): String {
+        val dealerLabel = case.dealerCard.strategyLabel
+        val canDouble = case.playerCards.size == 2
+        val canSplit = case.playerCards.size == 2 &&
+            case.playerCards[0].splitGroup == case.playerCards[1].splitGroup
+        val canSurrender = case.playerCards.size == 2 && dealerLabel != "A"
+        val handRead = Strategy.readHand(case.playerCards)
+        return diagnosticDecisionKey(handRead, dealerLabel, canDouble, canSplit, canSurrender)
     }
 
     private fun card(rank: String, suit: Suit = Suit.SPADES): PlayingCard = PlayingCard(rank, suit)
