@@ -357,8 +357,8 @@ class TrainerViewModel(
                 correct = decision.action,
                 note = decision.note
             )
+            applyAction(action)
             if (correct) {
-                applyAction(action)
                 advanceDiagnosticHandOrCase()
             } else {
                 pendingDiagnosticAction = action
@@ -490,7 +490,12 @@ class TrainerViewModel(
             Action.SURRENDER -> updateHand(idx, hand.copy(finished = true, surrendered = true))
 
             Action.HIT -> {
-                val newCards = hand.cards + randomCard()
+                val currentTotal = Strategy.handValue(hand.cards).first
+                val allowedCards = listOf("2", "3", "4", "5", "6", "7", "8", "9", "10", "J", "Q", "K", "A")
+                    .map { rank -> card(rank) }
+                    .filter { candidate -> Strategy.handValue(hand.cards + candidate).first != 21 }
+                val newCard = if (allowedCards.isNotEmpty()) allowedCards.random() else randomCard()
+                val newCards = hand.cards + newCard
                 val autoStop = Strategy.handValue(newCards).first >= 21
                 updateHand(idx, hand.copy(cards = newCards, finished = autoStop))
             }
